@@ -34,7 +34,7 @@ export default function NextStepScreen() {
         {/* الكارت الثاني: Connect to Child Device */}
         <TouchableOpacity 
           style={styles.card}
-          onPress={() => router.push('/childDevice')} // أو الصفحة اللي بتعمل كونكت
+          onPress={() => router.push('/childSignUp')} // أو الصفحة اللي بتعمل كونكت
         >
           <View style={styles.iconContainer}>
             <MaterialCommunityIcons name="cellphone-link" size={35} color="#0288D1" />

@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import SharedPreferences from 'react-native-shared-preferences'; // 1. استيراد المكتبة
+import SharedPreferences from 'react-native-shared-preferences'; 
 import { 
   ActivityIndicator, 
   Alert, 
@@ -17,6 +17,7 @@ import {
 
 export default function childLogin() {
   const router = useRouter();
+  const params = useLocalSearchParams(); // استلام البارامترات القادمة من صفحات أخرى
   
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
@@ -25,13 +26,27 @@ export default function childLogin() {
 
   useEffect(() => {
     const clearSession = async () => {
-      await AsyncStorage.multiRemove(['userToken', 'childInfo', 'userType']);
-      // تنظيف الـ ID من الـ Native برضه عند فتح الشاشة
-      SharedPreferences.setName("UserPrefs");
-      SharedPreferences.setItem("child_id", "0");
+      try {
+        // تنظيف آمن لـ AsyncStorage
+        await AsyncStorage.multiRemove(['userToken', 'childInfo', 'userType']);
+        
+        // تنظيف آمن لـ Native Shared Preferences مع حماية من الأخطاء
+        try {
+          SharedPreferences.setName("UserPrefs");
+          SharedPreferences.setItem("child_id", "0");
+        } catch (nativeError) {
+          console.log("Native SharedPrefs not initialized, skipping cleanup.");
+        }
+      } catch (error) {
+        console.log("Error in clearSession:", error);
+      }
     };
-    clearSession();
-  }, []);
+
+    // لا نمسح الجلسة إذا كان هناك كود ربط قادم من صفحة التسجيل
+    if (!params.code) {
+      clearSession();
+    }
+  }, [params.code]);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -55,10 +70,13 @@ export default function childLogin() {
         const cleanToken = response.data.access_token.replace(/"/g, '');
         const childData = response.data.user;
 
-        // --- الجزء المضاف للربط مع الـ Native ---
-        SharedPreferences.setName("UserPrefs");
-        SharedPreferences.setItem("child_id", childData.id.toString());
-        // ---------------------------------------
+        // الربط مع الـ Native مع معالجة الأخطاء
+        try {
+          SharedPreferences.setName("UserPrefs");
+          SharedPreferences.setItem("child_id", childData.id.toString());
+        } catch (e) {
+          console.log("Could not save to Native SharedPreferences");
+        }
 
         await AsyncStorage.setItem('userToken', cleanToken);
         await AsyncStorage.setItem('childInfo', JSON.stringify(childData)); 
@@ -68,7 +86,6 @@ export default function childLogin() {
 
         if (isActive === 1 || isActive === true) {
           await AsyncStorage.setItem('isPaired', 'true');
-          console.log("✅ Login Successful, ID saved to Native.");
           router.replace('/welcomeChild'); 
         } else {
           await AsyncStorage.removeItem('isPaired');
@@ -88,7 +105,6 @@ export default function childLogin() {
     }
   };
 
-  // ... باقي كود الـ UI (نفس الـ return والـ styles بدون أي تغيير)
   return (
     <SafeAreaView style={styles.container}>
       <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>

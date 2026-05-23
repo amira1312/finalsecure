@@ -10,7 +10,7 @@ export default function ChildSignUp() {
   
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const [age, setAge] = useState(''); // السن بقى متغير هنا
+  const [age, setAge] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -38,17 +38,12 @@ export default function ChildSignUp() {
     try {
       const parentToken = await AsyncStorage.getItem('userToken');
 
-      // تحديد النوع بناءً على السن اللي إنتي قولتيه
-      // من 0 لـ 2 -> infantChild | أكبر من 2 -> child
-      const childType = ageNum <= 2 ? 'infantChild' : 'child';
-
       const response = await axios.post('http://192.168.1.9:8000/api/parent/childs/store', {
         name: fullName,
         email: email,
         password: password,
         password_confirmation: confirmPassword,
-        type: 'child', // ببعت النوع المتحدد أتوماتيك
-        age: ageNum,    // ببعت السن الحقيقي
+        type: ageNum <= 2 ? 'infant' : 'child', 
         date_of_birth: '2025-01-01'
       }, {
         headers: {
@@ -58,23 +53,17 @@ export default function ChildSignUp() {
       });
 
       if (response.status === 200 || response.status === 201) {
-        const pairingCode = response.data.pairing_code;
-        
-        // التوجيه الذكي (Smart Routing)
-        // if (childType === 'infantChild') {
-        //   Alert.alert("Success", "Infant account created. Redirecting to baby monitor setup...");
-        //   router.push({ pathname: '/infantPairing', params: { code: pairingCode } });
-        // } else {
-        //   Alert.alert("Success", "Child account created. Redirecting to device pairing...");
-        //   router.push({ pathname: '/childDevice', params: { code: pairingCode } });
-        // }
-        if (ageNum <= 2) {
-  // توجيه لداشبورد الرضيع
-  router.push({ pathname: '/infantRoom', params: { code: response.data.pairing_code } });
-       } else {
-  // توجيه لداشبورد التحكم العادي
-       router.push({ pathname: '/childLogin', params: { code: response.data.pairing_code } });
-           }
+        // استخراج البيانات المحدثة من السيرفر
+        const childId = response.data.data.id;
+        const childName = response.data.data.name;
+
+        Alert.alert("Success", "Account created successfully!");
+
+        // التوجيه الذكي باستخدام الـ ID لضمان جلب الكود الصحيح
+        router.replace({ 
+          pathname: '/childDevice', 
+          params: { childId: childId, childName: childName } 
+        });
       }
     } catch (error: any) {
       console.log('Error details:', error.response?.data);
@@ -101,7 +90,6 @@ export default function ChildSignUp() {
           </View>
         </View>
 
-        {/* حقل الاسم */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Child Name</Text>
           <TextInput 
@@ -113,7 +101,6 @@ export default function ChildSignUp() {
           />
         </View>
 
-        {/* حقل السن - جديد */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Age (0 - 16)</Text>
           <TextInput 
@@ -124,14 +111,8 @@ export default function ChildSignUp() {
             value={age}
             onChangeText={setAge}
           />
-          {age !== '' && (
-            <Text style={styles.typeTag}>
-                Status: {parseInt(age) <= 2 ? 'Infant (Baby Monitor Mode)' : 'Child (Control Mode)'}
-            </Text>
-          )}
         </View>
 
-        {/* حقل البريد */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Email Address</Text>
           <TextInput 
@@ -144,7 +125,6 @@ export default function ChildSignUp() {
           />
         </View>
 
-        {/* الباسوردات */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Password</Text>
           <View style={styles.passwordWrapper}>
@@ -199,7 +179,6 @@ const styles = StyleSheet.create({
   input: { width: '100%', height: 55, backgroundColor: '#fff', borderRadius: 18, paddingHorizontal: 20, fontSize: 14, borderWidth: 1, borderColor: '#BBDEFB', color: '#01579B' },
   passwordWrapper: { position: 'relative' },
   eyeIcon: { position: 'absolute', right: 20, top: 18 },
-  typeTag: { fontSize: 12, color: '#0288D1', marginTop: 5, fontWeight: 'bold', textAlign: 'right' },
   saveBtn: { width: '100%', height: 60, backgroundColor: '#90CAF9', borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginTop: 10 },
   saveBtnText: { color: '#0D47A1', fontSize: 18, fontWeight: 'bold' }
 });

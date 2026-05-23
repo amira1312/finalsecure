@@ -11,16 +11,17 @@ export default function AddDeviceScreen() {
   const [seconds, setSeconds] = useState(600); 
   const [pairingCode, setPairingCode] = useState('');
 
-  // 2. الدالة المعدلة (بترجع العداد من الأول وتغير الكود)
+  // 2. دالة توليد كود (أرقام فقط لضمان التوافق)
   const generateRandomCode = () => {
-    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    // تم الاكتفاء بالأرقام فقط لضمان توافقها مع الـ TextInput في تطبيق الطفل
+    const chars = '0123456789'; 
     let result = '';
     for (let i = 0; i < 6; i++) {
       result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     
-    setPairingCode(result); // تحديث الكود
-    setSeconds(600);        // إعادة العداد لـ 10 دقائق فوراً
+    setPairingCode(result); 
+    setSeconds(600); // إعادة العداد لـ 10 دقائق
   };
 
   // 3. توليد الكود أول ما الشاشة تفتح
@@ -28,7 +29,7 @@ export default function AddDeviceScreen() {
     generateRandomCode();
   }, []);
 
-  // 4. كود العداد (بيشتغل أوتوماتيك أول ما الـ seconds تتغير)
+  // 4. كود العداد
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (seconds > 0) {
@@ -60,7 +61,7 @@ export default function AddDeviceScreen() {
         Expires after {formatTime(seconds)} ⏱️
       </Text>
 
-      {/* زرار الـ Resend اللي بيصفر العداد */}
+      {/* زرار الـ Resend */}
       <TouchableOpacity 
         style={styles.resendBtn} 
         onPress={generateRandomCode}
@@ -80,7 +81,7 @@ const styles = StyleSheet.create({
     paddingVertical: 20, 
     borderRadius: 20, 
     marginBottom: 20,
-    elevation: 8, // زيادة الظل عشان يبان "كارت" زي اللي في الصورة
+    elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,

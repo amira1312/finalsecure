@@ -34,10 +34,10 @@ export default function PairingScreen() {
     }
 
     try {
-      // 1. نجيب التوكن اللي اتخزن وقت الـ Login بتاع الطفل
       const token = await AsyncStorage.getItem('userToken');
       
-      const response = await axios.post('http://192.168.1.9:8000/api/child/pairing', {
+      // تم تحديث المسار ليتوافق مع المسار الجديد في السيرفر
+      const response = await axios.post('http://192.168.1.9:8000/api/child/verify-pairing', {
         code: fullCode, 
       }, {
         headers: { 
@@ -46,26 +46,12 @@ export default function PairingScreen() {
         }
       });
 
-      // if (response.data.success) {
-      //   // --- التعديل السحري هنا ---
-      //   // 2. بنخزن علامة (Flag) إن الجهاز ده خلاص تم ربطه بنجاح
-      //   await AsyncStorage.setItem('isPaired', 'true'); 
-        
-      //   Alert.alert("Success", "Device linked successfully!");
-        
-      //   // 3. نستخدم replace عشان نمسح صفحة الكود من الـ History وما يرجعش لها بالـ Back
-      //   router.replace('/welcomeChild'); 
-      // }
       if (response.data.success) {
-        // 1. تخزين الـ Role عشان الـ index يعرف إن ده طفل
         await AsyncStorage.setItem('userRole', 'child'); 
-        
-        // 2. تخزين علامة إن الربط تم (اختياري بس مفيد)
         await AsyncStorage.setItem('isPaired', 'true'); 
         
         Alert.alert("Success", "Device linked successfully!");
         
-        // 3. التوجه لصفحة الطفل
         router.replace('/welcomeChild'); 
       }
     } catch (error: any) {

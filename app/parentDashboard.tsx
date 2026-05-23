@@ -35,11 +35,10 @@ export default function ParentDashboard() {
   const [screenTime, setScreenTime] = useState("0h 0m");
 
   const [isHardwareOnline, setIsHardwareOnline] = useState(false);
-  const [latestAlert, setLatestAlert] = useState<any>(null); // <-- State مضاف لحفظ آخر تنبيه قادم من لارافيل للطفل الحالي
+  const [latestAlert, setLatestAlert] = useState<any>(null);
 
   const checkHardwareStatus = useCallback(async () => {
     try {
-      // 🟢 تعديل المسار ليطابق الرابط العام الجديد المبني على الكاش في لارافيل
       const response = await axios.get(`${API_BASE_URL}/hardware/light-status`);
       setIsHardwareOnline(response.data.is_online);
     } catch (error) {
@@ -116,7 +115,6 @@ export default function ParentDashboard() {
     }
   }, []);
 
-  // 🛡️ دالة مضافة لجلب التنبيه الأمني الفعلي المخزن للطفل الحالي في لارافيل وعرضه بالكارد
   const fetchLaravelAlerts = useCallback(async (childId: number | string, token: string) => {
     try {
       const headers = { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' };
@@ -131,7 +129,6 @@ export default function ParentDashboard() {
     }
   }, []);
 
-  // 🔄 دالة مضافة لتصفير العداد محلياً وفي السيرفر عند الضغط على الكارد وقبل الذهاب للريبورتات
   const handleAlertBoxPress = async () => {
     if (!selectedChild?.id) return;
     try {
@@ -164,13 +161,12 @@ export default function ParentDashboard() {
       if (token && selectedChild?.id) {
         fetchChildLocation(selectedChild.id, token);
         fetchChildUsage(selectedChild.id, token);
-        fetchLaravelAlerts(selectedChild.id, token); // جلب أول تنبيه
+        fetchLaravelAlerts(selectedChild.id, token);
 
         locationInterval = setInterval(() => {
           fetchChildLocation(selectedChild.id, token);
         }, 30000);
 
-        // تحديث حي لعداد الإشعارات والبيانات كل 10 ثوانٍ تلقائياً
         alertsInterval = setInterval(() => {
           fetchLaravelAlerts(selectedChild.id, token);
           axios.get(`${API_BASE_URL}/parent/childs`, { headers: { 'Authorization': `Bearer ${token}` } })
@@ -231,9 +227,6 @@ export default function ParentDashboard() {
           <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/notificationSettings')}>
             <Ionicons name="notifications-outline" size={26} color="#01579B" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/editProfile')}>
-            <Ionicons name="settings-outline" size={26} color="#01579B" />
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -251,7 +244,7 @@ export default function ParentDashboard() {
 
           <TouchableOpacity 
             style={styles.familyMember} 
-            onPress={() => router.push('/infantRoom')} // توجيه لغرفة الطفل بشكل صحيح
+            onPress={() => router.push('/infantRoom')}
           >
             <View style={getHardwareAvatarStyle(isHardwareOnline)}>
               <MaterialCommunityIcons name="baby-face-outline" size={38} color={isHardwareOnline ? "#0288D1" : "#A0B4C8"} />
