@@ -17,36 +17,37 @@ import {
 
 export default function childLogin() {
   const router = useRouter();
-  const params = useLocalSearchParams(); // استلام البارامترات القادمة من صفحات أخرى
+  const params = useLocalSearchParams();
   
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // تم تعديل الـ useEffect ليفحص الجلسة بدلاً من مسحها
   useEffect(() => {
-    const clearSession = async () => {
+    const checkSession = async () => {
       try {
-        // تنظيف آمن لـ AsyncStorage
-        await AsyncStorage.multiRemove(['userToken', 'childInfo', 'userType']);
+        const token = await AsyncStorage.getItem('userToken');
+        const isPaired = await AsyncStorage.getItem('isPaired');
         
-        // تنظيف آمن لـ Native Shared Preferences مع حماية من الأخطاء
-        try {
-          SharedPreferences.setName("UserPrefs");
-          SharedPreferences.setItem("child_id", "0");
-        } catch (nativeError) {
-          console.log("Native SharedPrefs not initialized, skipping cleanup.");
+        if (token) {
+          if (isPaired === 'true') {
+            router.replace('/welcomeChild');
+          } else {
+            router.replace('/pairingScreen');
+          }
         }
       } catch (error) {
-        console.log("Error in clearSession:", error);
+        console.log("Error checking existing session:", error);
       }
     };
 
-    // لا نمسح الجلسة إذا كان هناك كود ربط قادم من صفحة التسجيل
+    // فقط إذا لم يكن هناك كود ربط قادم (حالة تسجيل دخول جديد)
     if (!params.code) {
-      clearSession();
+      checkSession();
     }
-  }, [params.code]);
+  }, []);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -70,7 +71,6 @@ export default function childLogin() {
         const cleanToken = response.data.access_token.replace(/"/g, '');
         const childData = response.data.user;
 
-        // الربط مع الـ Native مع معالجة الأخطاء
         try {
           SharedPreferences.setName("UserPrefs");
           SharedPreferences.setItem("child_id", childData.id.toString());

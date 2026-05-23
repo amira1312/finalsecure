@@ -21,7 +21,7 @@ export default function DowntimeScreen() {
   const router = useRouter();
   const { childId } = useLocalSearchParams(); 
 
-  // --- 1. الـ States الأساسية ---
+  // --- 1. الـ States الأساسية الأصلية ---
   const [isEnabled, setIsEnabled] = useState(true);
   const [applyToAll, setApplyToAll] = useState(true);
   const [blockDowntime, setBlockDowntime] = useState(true);
@@ -30,16 +30,51 @@ export default function DowntimeScreen() {
   const [childrenList, setChildrenList] = useState<any[]>([]);
   const [selectedChildrenIds, setSelectedChildrenIds] = useState<number[]>([]);
 
-  // --- 2. لوجيك الوقت ---
+  // --- 2. لوجيك الوقت الأصلي ---
   const [fromDate, setFromDate] = useState(new Date());
   const [toDate, setToDate] = useState(new Date());
   const [showPicker, setShowPicker] = useState(false);
   const [pickerMode, setPickerMode] = useState<'from' | 'to'>('from');
 
-  // جلب قائمة الأطفال عند فتح الصفحة
+  const dayNamesEnglish = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+  const getFormattedSelectedDays = () => {
+    if (selectedDays.length === 7) return "Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday";
+    if (selectedDays.length === 0) return "No days selected";
+    return [...selectedDays]
+      .sort((a, b) => a - b)
+      .map(index => dayNamesEnglish[index])
+      .join(', ');
+  };
+
+  // 🔄 عند فتح الصفحة: جلب الأطفال وقراءة آخر جدول تم حفظه لهذا الطفل لتثبيته
   useEffect(() => {
     fetchChildren();
-  }, []);
+    loadSavedLocalSchedule();
+  }, [childId]);
+
+  // 📥 دالة قراءة الجدول المحفوظ محلياً لمنعه من الاختفاء
+  const loadSavedLocalSchedule = async () => {
+    try {
+      const key = `downtime_schedule_${childId || 'all'}`;
+      const localData = await AsyncStorage.getItem(key);
+      if (localData) {
+        const parsed = JSON.parse(localData);
+        setIsEnabled(parsed.isEnabled);
+        setSelectedDays(parsed.selectedDays);
+        
+        const fDate = new Date();
+        fDate.setHours(parsed.fromHours, parsed.fromMinutes, 0);
+        setFromDate(fDate);
+
+        const tDate = new Date();
+        tDate.setHours(parsed.toHours, parsed.toMinutes, 0);
+        setToDate(tDate);
+      }
+    } catch (e) {
+      console.log("Error loading local schedule:", e);
+    }
+  };
 
   const fetchChildren = async () => {
     try {
@@ -47,11 +82,9 @@ export default function DowntimeScreen() {
       const res = await axios.get(`${API_BASE_URL}/childs`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      // التعامل مع شكل الداتا الراجع من السيرفر
       const data = Array.isArray(res.data) ? res.data : (res.data.data || []);
       setChildrenList(data);
       
-      // لو جاي من الداشبورد لطفل معين، نحدده تلقائياً في القائمة
       if (childId) {
         setSelectedChildrenIds([Number(childId)]);
         setApplyToAll(false);
@@ -67,7 +100,6 @@ export default function DowntimeScreen() {
     return `${hours}:${minutes}:00`;
   };
 
-  // --- 3. لوجيك اختيار الأطفال ---
   const toggleChildSelection = (id: number) => {
     if (selectedChildrenIds.includes(id)) {
       setSelectedChildrenIds(selectedChildrenIds.filter(item => item !== id));
@@ -76,7 +108,7 @@ export default function DowntimeScreen() {
     }
   };
 
-  // --- 4. حفظ التغييرات ---
+  // --- 3. حفظ التغييرات الأصلي + الحظر المحلي ---
   const handleSaveChanges = async () => {
     const targetIds = applyToAll ? childrenList.map(c => c.id) : selectedChildrenIds;
 
@@ -103,7 +135,6 @@ export default function DowntimeScreen() {
         is_enabled: isEnabled ? 1 : 0
       };
 
-      // تنفيذ الطلب لكل طفل مختار
       await Promise.all(targetIds.map(id => {
         const childObj = childrenList.find(c => c.id === id);
         return axios.post(`${API_BASE_URL}/downtimes/store`, 
@@ -116,7 +147,19 @@ export default function DowntimeScreen() {
         );
       }));
 
-      Alert.alert("Success ✅", "Downtime settings saved for selected children!");
+      // 💾 حفظ الجدول الحالي في الذاكرة لتثبيته في البوكس فوراً عند العودة للشاشة
+      const key = `downtime_schedule_${childId || 'all'}`;
+      const localScheduleData = {
+        isEnabled,
+        selectedDays,
+        fromHours: fromDate.getHours(),
+        fromMinutes: fromDate.getMinutes(),
+        toHours: toDate.getHours(),
+        toMinutes: toDate.getMinutes()
+      };
+      await AsyncStorage.setItem(key, JSON.stringify(localScheduleData));
+
+      Alert.alert("Success ✅", "Downtime settings saved successfully!");
       router.back();
     } catch (error: any) {
       Alert.alert("Error ❌", error.response?.data?.message || "Failed to save settings.");
@@ -158,17 +201,17 @@ export default function DowntimeScreen() {
             </View>
             <Switch value={isEnabled} onValueChange={setIsEnabled} trackColor={{ true: '#0288D1' }} />
           </View>
-          <Text style={styles.cardSubText}>Set a schedule to restrict device access during certain time...</Text>
+          <Text style={styles.cardSubText}>Set a schedule to restrict device access during certain time, like bedtime or school hours.</Text>
           
           <View style={[styles.timeRow, !isEnabled && { opacity: 0.5 }]}>
             <TouchableOpacity onPress={() => isEnabled && (setPickerMode('from'), setShowPicker(true))}>
               <Text style={styles.timeLabel}>From</Text>
-              <Text style={styles.timeValue}>{fromDate.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</Text>
+              <Text style={styles.timeValue}>{fromDate.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12: true})}</Text>
             </TouchableOpacity>
             <View style={styles.timeDivider} />
             <TouchableOpacity onPress={() => isEnabled && (setPickerMode('to'), setShowPicker(true))}>
               <Text style={styles.timeLabel}>To</Text>
-              <Text style={styles.timeValue}>{toDate.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</Text>
+              <Text style={styles.timeValue}>{toDate.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12: true})}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -200,7 +243,6 @@ export default function DowntimeScreen() {
             />
           </View>
 
-          {/* قائمة الأطفال تظهر فقط عند إغلاق "All Children" */}
           {!applyToAll && (
             <View style={styles.childListContainer}>
               <View style={styles.divider} />
@@ -225,13 +267,15 @@ export default function DowntimeScreen() {
           )}
         </View>
 
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-             <Text style={styles.cardTitle}>Block during downtime</Text>
-             <Switch value={blockDowntime} onValueChange={setBlockDowntime} trackColor={{ true: '#0288D1' }} />
+        {/* 🛡️ البوكس التعريفي اللبني (ثابت ومسجل دائماً بناءً على حفظ الذاكرة) */}
+        {isEnabled && selectedDays.length > 0 && (
+          <View style={styles.infoBox}>
+            <Ionicons name="alert-circle" size={24} color="#0288D1" style={styles.infoIcon} />
+            <Text style={styles.infoText}>
+              Scheduled for {getFormattedSelectedDays()} from {fromDate.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12: true})} to {toDate.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12: true})}.
+            </Text>
           </View>
-          <Text style={styles.cardSubText}>If on, devices cannot be used during the scheduled downtime.</Text>
-        </View>
+        )}
 
         <TouchableOpacity style={styles.saveButton} onPress={handleSaveChanges} disabled={loading}>
           {loading ? <ActivityIndicator color="#0D47A1" /> : <Text style={styles.saveButtonText}>Save Changes</Text>}
@@ -259,7 +303,7 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   iconTitle: { flexDirection: 'row', alignItems: 'center' },
   cardTitle: { fontSize: 18, fontWeight: 'bold', color: '#0D47A1', marginLeft: 5 },
-  cardSubText: { color: '#0288D1', fontSize: 12, marginTop: 10, opacity: 0.8 },
+  cardSubText: { color: '#0288D1', fontSize: 13, marginTop: 10, opacity: 0.8, lineHeight: 18 },
   timeRow: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 20, alignItems: 'center' },
   timeLabel: { color: '#0288D1', textAlign: 'center', fontSize: 12 },
   timeValue: { fontSize: 22, fontWeight: 'bold', color: '#0D47A1' },
@@ -276,6 +320,22 @@ const styles = StyleSheet.create({
   childItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },
   childInfo: { flexDirection: 'row', alignItems: 'center' },
   childName: { marginLeft: 10, fontSize: 16, color: '#0D47A1' },
+  
+  infoBox: {
+    backgroundColor: '#BBDEFB',
+    borderRadius: 20,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    alignSelf: 'center',
+    marginVertical: 10,
+    borderWidth: 1.5,
+    borderColor: '#90CAF9',
+  },
+  infoIcon: { marginRight: 12 },
+  infoText: { color: '#0288D1', fontSize: 13, fontWeight: '600', flex: 1, lineHeight: 18 },
+
   saveButton: { backgroundColor: '#90CAF9', padding: 18, borderRadius: 25, alignItems: 'center', marginTop: 10, marginBottom: 40, elevation: 3 },
   saveButtonText: { color: '#0D47A1', fontSize: 18, fontWeight: 'bold' }
 });

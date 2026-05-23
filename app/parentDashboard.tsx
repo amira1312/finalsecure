@@ -90,12 +90,13 @@ export default function ParentDashboard() {
     }
   };
 
+  // هذا هو المصدر الوحيد الموحد لجلب بيانات الموقع للداشبورد
   const fetchChildLocation = useCallback(async (childId: number | string, token: string) => {
     try {
       const headers = { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' };
       const response = await axios.get(`${API_BASE_URL}/parent/locations/show/${childId}`, { headers });
-      const locations = response.data.data?.locations || [];
-      setChildLocation(locations.length > 0 ? locations[0] : null);
+      const locData = response.data.data?.location; // الوصول للكائن المباشر كما في الـ Log
+      setChildLocation(locData || null);
     } catch (error) {
       setChildLocation(null);
     }

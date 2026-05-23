@@ -24,13 +24,6 @@ export default function ChildProfile() {
   const [loading, setLoading] = useState(true);
   const [appRequests, setAppRequests] = useState<any[]>([]); 
 
-  // الأقسام الثابتة التي ترغبين في ظهورها دائماً
-  const categories = [
-    { id: 'social', title: 'Social Apps', icon: 'people' },
-    { id: 'games', title: 'Game Zone', icon: 'game-controller' },
-    { id: 'education', title: 'Education', icon: 'book' }
-  ];
-
   const fetchData = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
@@ -43,8 +36,10 @@ export default function ChildProfile() {
 
       try {
         const appsRes = await axios.get(`${API_BASE_URL}/app-requests/${id}`, { headers });
-        const pendingOnly = (appsRes.data.data || []).filter((req: any) => req.status === 'pending');
-        setAppRequests(pendingOnly);
+        const relevantApps = (appsRes.data.data || []).filter(
+          (req: any) => req.status === 'pending' || req.status === 'rejected'
+        );
+        setAppRequests(relevantApps);
       } catch (e) {
         setAppRequests([]); 
       }
@@ -65,15 +60,24 @@ export default function ChildProfile() {
         status: status
       }, { headers });
 
-      setAppRequests(prev => prev.filter(app => app.id !== requestId));
-      Alert.alert("نجاح", status === 'approved' ? "تم السماح بالتطبيق" : "تم رفض التطبيق");
+      fetchData(); 
+      Alert.alert("نجاح", status === 'approved' ? "تم تحديث حالة التطبيق بنجاح" : "تم رفض التطبيق");
     } catch (error) {
       Alert.alert("خطأ", "فشل في تحديث حالة التطبيق");
     }
   };
 
+  // useEffect لجلب البيانات عند فتح الصفحة
   useEffect(() => { 
     if (id) fetchData(); 
+  }, [id]);
+
+  // useEffect جديد لتحديث الموقع والبيانات كل 30 ثانية
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (id) fetchData();
+    }, 30000);
+    return () => clearInterval(interval);
   }, [id]);
 
   if (loading) return <View style={styles.loadingCenter}><ActivityIndicator size="large" color="#0288D1" /></View>;
@@ -121,52 +125,36 @@ export default function ChildProfile() {
           </View>
         </View>
 
-        {/* قسم طلبات التطبيقات مقسم لـ Categories */}
-        <Text style={styles.sectionLabel}>New App Requests</Text>
+        <Text style={styles.sectionLabel}>App Requests</Text>
         
-        {categories.map((cat) => (
-          <View key={cat.id} style={styles.categoryContainer}>
-            <View style={styles.categoryHeader}>
-              <Ionicons name={cat.icon as any} size={18} color="#FFF" />
-              <Text style={styles.categoryHeaderText}>{cat.title}</Text>
-            </View>
-
-            {appRequests.filter(app => app.category === cat.id).length > 0 ? (
-              appRequests.filter(app => app.category === cat.id).map((app) => (
-                <View key={app.id} style={styles.appRequestCard}>
-                  <View style={styles.appIconPlaceholder}><Ionicons name="grid" size={24} color="#0288D1" /></View>
-                  <Text style={styles.appName}>{app.app_name}</Text>
-                  <View style={styles.actionIcons}>
-                     <TouchableOpacity onPress={() => handleAppAction(app.id, 'rejected')}>
-                        <Ionicons name="close-circle" size={38} color="#0288D1" style={{marginRight: 8}} />
-                     </TouchableOpacity>
-                     <TouchableOpacity onPress={() => handleAppAction(app.id, 'approved')}>
-                        <Ionicons name="checkmark-circle" size={38} color="#29B6F6" />
-                     </TouchableOpacity>
-                  </View>
-                </View>
-              ))
-            ) : (
-              <Text style={styles.noAppsText}>No pending {cat.title.toLowerCase()} requests</Text>
-            )}
-          </View>
-        ))}
-
-        <Text style={styles.sectionLabel}>Recent Alert from Untrusted Numbers</Text>
-        <View style={styles.alertCard}>
-           <View style={styles.alertHeaderRow}>
-              <View style={styles.msgIcon}><Ionicons name="chatbubble" size={24} color="#FFD600" /></View>
-              <View>
-                 <Text style={styles.phoneNumber}>(555) 123-4567</Text>
-                 <Text style={styles.msgTime}>Today, 2:15 pm</Text>
+        {appRequests.length > 0 ? (
+          appRequests.map((app) => (
+            <View key={app.id} style={[styles.appRequestCard, app.status === 'rejected' && { opacity: 0.6 }]}>
+              <View style={styles.appIconPlaceholder}><Ionicons name="grid" size={24} color="#0288D1" /></View>
+              <Text style={styles.appName}>{app.app_name} {app.status === 'rejected' && '(Rejected)'}</Text>
+              
+              <View style={styles.actionIcons}>
+                {app.status === 'rejected' ? (
+                  <TouchableOpacity onPress={() => handleAppAction(app.id, 'approved')}>
+                    {/* أيقونة الصح الخضراء بدل الريفرش */}
+                    <Ionicons name="checkmark-circle" size={38} color="#4CAF50" />
+                  </TouchableOpacity>
+                ) : (
+                  <>
+                    <TouchableOpacity onPress={() => handleAppAction(app.id, 'rejected')}>
+                      <Ionicons name="close-circle" size={38} color="#0288D1" style={{marginRight: 8}} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleAppAction(app.id, 'approved')}>
+                      <Ionicons name="checkmark-circle" size={38} color="#29B6F6" />
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
-           </View>
-           <Text style={styles.msgContent}>“Hi, We met you at the park.”</Text>
-           <TouchableOpacity style={styles.trustBtn}>
-              <Ionicons name="shield-checkmark-outline" size={18} color="#0288D1" />
-              <Text style={styles.trustBtnText}>Add to Trust</Text>
-           </TouchableOpacity>
-        </View>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.noAppsText}>No new pending requests</Text>
+        )}
 
         <TouchableOpacity style={styles.manageBtn} onPress={() => router.push({ pathname: '/manageApps', params: { childId: id } })}>
             <Text style={styles.manageBtnText}>Manage App Settings</Text>
@@ -196,25 +184,11 @@ const styles = StyleSheet.create({
   locNameText: { fontSize: 22, fontWeight: 'bold', color: '#01579B', marginVertical: 2 },
   locTimeText: { color: '#0288D1', fontSize: 11 },
   sectionLabel: { fontSize: 20, fontWeight: 'bold', color: '#01579B', marginLeft: 20, marginBottom: 15, marginTop: 10 },
-  
-  // Styles الجديدة للأقسام الثابتة
-  categoryContainer: { marginBottom: 15 },
-  categoryHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0288D1', marginHorizontal: 20, paddingVertical: 8, paddingHorizontal: 15, borderRadius: 12, marginBottom: 8 },
-  categoryHeaderText: { color: '#FFF', fontWeight: 'bold', fontSize: 15, marginLeft: 10 },
-  noAppsText: { textAlign: 'center', color: '#01579B', fontSize: 13, fontStyle: 'italic', marginVertical: 5 },
-
+  noAppsText: { textAlign: 'center', color: '#01579B', fontSize: 15, fontStyle: 'italic', marginVertical: 10 },
   appRequestCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#BBDEFB', marginHorizontal: 20, padding: 15, borderRadius: 20, marginBottom: 12 },
   appIconPlaceholder: { width: 50, height: 50, backgroundColor: '#E1F5FE', borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   appName: { flex: 1, marginLeft: 15, fontSize: 18, fontWeight: 'bold', color: '#01579B' },
   actionIcons: { flexDirection: 'row', alignItems: 'center' },
-  alertCard: { backgroundColor: '#BBDEFB', marginHorizontal: 20, padding: 20, borderRadius: 25, marginBottom: 20 },
-  alertHeaderRow: { flexDirection: 'row', alignItems: 'center' },
-  msgIcon: { marginRight: 15 },
-  phoneNumber: { fontSize: 20, fontWeight: 'bold', color: '#0288D1' },
-  msgTime: { color: '#4FC3F7', fontSize: 13 },
-  msgContent: { marginTop: 12, color: '#01579B', fontStyle: 'italic', marginLeft: 40, fontSize: 15 },
-  trustBtn: { alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center', backgroundColor: '#90CAF9', paddingVertical: 10, paddingHorizontal: 15, borderRadius: 12, marginTop: 10 },
-  trustBtnText: { marginLeft: 8, color: '#01579B', fontWeight: 'bold' },
   manageBtn: { backgroundColor: '#90CAF9', marginHorizontal: 20, padding: 20, borderRadius: 25, alignItems: 'center', marginTop: 10 },
   manageBtnText: { color: '#01579B', fontWeight: 'bold', fontSize: 18 }
 });
